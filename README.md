@@ -93,9 +93,16 @@ sources:
   - name: my-source          # display name
     command: "curl -s ..."    # shell command (must output JSON)
     interval: 60              # seconds between polls (min: 30)
+    cron: "*/5 * * * *"       # optional: cron expression (overrides interval)
     enabled: true             # toggle on/off
     dedupField: "id"          # optional: override dedup key field
     jsonPath: "data.items"    # optional: extract array from nested JSON
+    filter:                   # optional: only emit matching events (AND logic)
+      - field: score
+        op: gt
+        value: 100
+    transform:                # optional: customize notification content
+      template: "[{{type}}] {{title}} by {{author}}"
 ```
 
 **Dedup key priority:** `id` > `url` > `title` > `name` > SHA-256 hash
@@ -110,6 +117,80 @@ sources:
 | Docker containers | `docker ps --format json` |
 | Custom script | `node my-monitor.js` |
 | Any CLI tool | Any command that outputs JSON |
+
+### Cron Scheduling
+
+Use cron expressions instead of fixed intervals for precise scheduling:
+
+```yaml
+sources:
+  - name: morning-news
+    command: "curl -s https://api.example.com/news"
+    cron: "0 9 * * *"        # every day at 9:00 AM
+    enabled: true
+
+  - name: frequent-check
+    command: "curl -s https://api.example.com/status"
+    cron: "*/5 * * * *"      # every 5 minutes
+    enabled: true
+```
+
+When `cron` is set, `interval` is ignored.
+
+### Event Filtering
+
+Only receive events that match your conditions. All rules use AND logic:
+
+```yaml
+sources:
+  - name: important-alerts
+    command: "curl -s https://api.example.com/alerts"
+    interval: 60
+    filter:
+      - field: severity
+        op: equals
+        value: "critical"
+      - field: resolved
+        op: not_exists
+```
+
+**Available operators:**
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `contains` | Substring match (case-insensitive) | `{field: title, op: contains, value: "AI"}` |
+| `equals` | Exact match | `{field: status, op: equals, value: "open"}` |
+| `matches` | Regex match | `{field: type, op: matches, value: "Push\|Create"}` |
+| `gt` | Greater than (numeric) | `{field: score, op: gt, value: 100}` |
+| `lt` | Less than (numeric) | `{field: score, op: lt, value: 10}` |
+| `exists` | Field exists and not null | `{field: url, op: exists}` |
+| `not_exists` | Field missing or null | `{field: deleted, op: not_exists}` |
+
+Supports nested fields with dot notation: `field: "user.name"`
+
+### Content Transform
+
+Customize how notifications appear using templates or field selection:
+
+```yaml
+sources:
+  # Template: use {{field}} placeholders
+  - name: github-events
+    command: "curl -s https://api.github.com/events?per_page=5"
+    interval: 60
+    transform:
+      template: "[{{type}}] {{actor.login}} → {{repo.name}}"
+      eventType: "github_activity"    # optional: override event type label
+
+  # Fields: pick specific fields to display
+  - name: server-status
+    command: "curl -s https://api.example.com/servers"
+    interval: 120
+    transform:
+      fields: ["hostname", "status", "cpu", "memory"]
+```
+
+Templates support nested fields: `{{actor.login}}`, `{{repo.name}}`
 
 ### Webhook
 
