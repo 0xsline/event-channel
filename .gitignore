@@ -4,3 +4,4 @@ dist/
 channel-state.json
 .omc/
 .planning/
+.npmrc
