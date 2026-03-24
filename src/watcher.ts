@@ -34,11 +34,17 @@ export class Watcher {
       this.sources.push(webhook)
     }
 
+    let started = 0
     for (const source of this.sources) {
-      await source.start()
+      try {
+        await source.start()
+        started++
+      } catch (err) {
+        log(`Warning: failed to start ${source.type} source: ${err instanceof Error ? err.message : err}`)
+      }
     }
 
-    log(`Started ${this.sources.length} source(s)`)
+    log(`Started ${started}/${this.sources.length} source(s)`)
   }
 
   async stop(): Promise<void> {
